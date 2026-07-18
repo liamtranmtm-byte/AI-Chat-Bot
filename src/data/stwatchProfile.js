@@ -1,11 +1,11 @@
-// Du lieu nghiep vu rieng cua STWatch - dua vao system prompt de bot tra loi
-// dung thong tin that, khong bia. Can cap nhat file nay khi shop doi gia/mau moi.
+// Thong tin nghiep vu CO DINH cua STWatch (dia chi, dich vu) - it thay doi.
 //
-// San xuat that: nen thay the bang du lieu keo tu file/API cua shop (vd export
-// tu Google Sheet quan ly ton kho) thay vi go tay nhu ban demo nay.
+// Danh sach mau dong ho + gia + ton kho KHONG con go cung o day nua: chung duoc
+// doc truc tiep tu Google Sheet qua src/catalog.js. File nay chi giu phan thong
+// tin chung + mot ban fallback tinh de trang /demo van chay khi chua cau hinh
+// Google Service Account.
 
-const STWATCH_PROFILE = `
-THONG TIN CUA HANG (dung de tra loi khach, khong duoc bia them ngoai du lieu duoi day):
+const SHOP_INFO = `THONG TIN CUA HANG (dung de tra loi khach, khong duoc bia them):
 
 - Ten: STWatch - Trung tam Thu mua, Tham dinh, Bao duong Dong ho chinh hang
 - Dia chi showroom: 285 Phan Van Tri, Phuong Binh Loi Trung, TP.HCM
@@ -18,21 +18,31 @@ DICH VU:
 3. Tham dinh chinh hang - kiem tra xac thuc nguon goc
 4. Bao duong & sua chua - lau dau, thay pin, thay kinh, danh bong
 5. Phu kien: day deo, khoa, mat kinh
-6. Dao tao hoc vien sua dong ho chuyen nghiep
+6. Dao tao hoc vien sua dong ho chuyen nghiep`;
 
-MOT SO MAU DANG CO (vi du, gia co the doi theo thoi diem - luon nhac khach
-chot gia chinh xac tai showroom hoac hoi truc tiep nhan vien):
-- Rolex Datejust 126233 Champagne (36mm, QSD): khoang 275.000.000d
-- Rolex Datejust 116231 (36mm, QSD): khoang 265.000.000d
-- Rolex Datejust 116234 (36mm, QSD): khoang 215.000.000d
+// Ban fallback tinh (khop cau truc voi du lieu keo tu Sheet) - chi dung khi
+// Google Sheet chua cau hinh / loi ket noi.
+const STATIC_CATALOG_FALLBACK = [
+  {
+    id: 'RL001',
+    name: 'Rolex Datejust 126233 Champagne',
+    brand: 'Rolex',
+    price: '275.000.000d',
+    condition: 'Da qua su dung 95%',
+    inStock: true,
+    description: 'Mat so champagne - day Jubilee - day du hop va giay to',
+    image: '',
+  },
+  {
+    id: 'RL002',
+    name: 'Rolex Datejust 116231',
+    brand: 'Rolex',
+    price: '265.000.000d',
+    condition: 'Da qua su dung 90%',
+    inStock: true,
+    description: 'Mat so bac - day kim loai - co giay kiem dinh',
+    image: '',
+  },
+];
 
-QUY TAC TRA LOI:
-- Neu khach hoi mau khong co trong danh sach tren: tra loi la se kiem tra
-  ton kho that va lien he lai, KHONG bia gia hay tinh trang hang
-- Neu khach hoi ve tham dinh/thu mua dong ho ho dang co: xin thong tin
-  (loai may, tinh trang, co giay to khong) de chuyen nhan vien tham dinh
-- Muc tieu cuoi cung cua moi cuoc chat: mac dinh khach chot lich den showroom
-  hoac de lai SDT de nhan vien goi lai
-`;
-
-module.exports = { STWATCH_PROFILE };
+module.exports = { SHOP_INFO, STATIC_CATALOG_FALLBACK };

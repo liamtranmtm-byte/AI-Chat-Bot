@@ -2,12 +2,17 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const { getAIReply, getHistory } = require('./claudeClient');
-const { sendTextMessage, refreshAccessToken } = require('./zaloClient');
+const { sendTextMessage, sendImageMessage, refreshAccessToken } = require('./zaloClient');
 const { extractLead } = require('./leadExtractor');
 const { appendLead, loadLeads } = require('./leadStore');
+const { checkRate } = require('./rateLimiter');
 
 const app = express();
 app.use(express.json());
+
+// Cau tra loi mac dinh khi user bi chan spam (khong goi Claude)
+const RATE_LIMIT_REPLY = 'Da anh/chi oi, anh/chi nhan hoi nhanh nen em xu ly chua kip a. '
+  + 'Anh/chi cho em vai giay roi nhan lai giup em nhe ah.';
 
 // Kiem tra server song, dung de test nhanh sau khi deploy
 app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));
@@ -17,7 +22,7 @@ app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));
 app.use('/demo', express.static(path.join(__dirname, '..', 'public')));
 
 // Endpoint dung rieng cho trang demo - tai su dung dung 1 bo nao AI voi ban Zalo that,
-// chi khac o cho khong goi sendTextMessage() cua Zalo
+// chi khac o cho khong goi Zalo. Tra ve them imageUrl (neu bot muon khoe anh) va handoff.
 app.post('/demo-chat', async (req, res) => {
   try {
     const { userId, message } = req.body;
@@ -25,11 +30,17 @@ app.post('/demo-chat', async (req, res) => {
       return res.status(400).json({ error: 'Thieu userId hoac message' });
     }
 
-    const aiReply = await getAIReply(userId, message);
-    res.json({ reply: aiReply });
+    // Chan spam: neu vuot gioi han, tra loi mac dinh, khong goi Claude
+    const rate = checkRate(userId);
+    if (!rate.allowed) {
+      return res.json({ reply: RATE_LIMIT_REPLY, rateLimited: true });
+    }
+
+    const { reply, imageUrl, handoff } = await getAIReply(userId, message);
+    res.json({ reply, imageUrl, handoff });
 
     // Ghi lead ngam giong nhu ben Zalo, de demo cung the hien duoc phan nay
-    extractLead(userId, getHistory(userId))
+    extractLead(userId, getHistory(userId), { source: 'demo', needs_human: handoff })
       .then((lead) => {
         if (lead.has_lead) appendLead(lead);
       })
@@ -54,13 +65,26 @@ app.post('/webhook', async (req, res) => {
 
       console.log(`Tin nhan tu ${userId}: ${userMessage}`);
 
-      const aiReply = await getAIReply(userId, userMessage);
-      await sendTextMessage(userId, aiReply);
+      // Chan spam: neu vuot gioi han, gui cau mac dinh, khong goi Claude
+      const rate = checkRate(userId);
+      if (!rate.allowed) {
+        await sendTextMessage(userId, RATE_LIMIT_REPLY);
+        return;
+      }
 
-      console.log(`Da tra loi ${userId}: ${aiReply}`);
+      const { reply, imageUrl, handoff } = await getAIReply(userId, userMessage);
+      await sendTextMessage(userId, reply);
+
+      // Neu bot xac dinh dung 1 mau con hang -> gui kem anh
+      if (imageUrl) {
+        await sendImageMessage(userId, imageUrl);
+        console.log(`Da gui anh ${imageUrl} cho ${userId}`);
+      }
+
+      console.log(`Da tra loi ${userId}: ${reply}${handoff ? ' [HANDOFF]' : ''}`);
 
       // Chay ngam, khong lam cham viec tra loi khach
-      extractLead(userId, getHistory(userId))
+      extractLead(userId, getHistory(userId), { source: 'zalo', needs_human: handoff })
         .then((lead) => {
           if (lead.has_lead) {
             appendLead(lead);
@@ -77,11 +101,16 @@ app.post('/webhook', async (req, res) => {
 
 // Xem danh sach lead da ghi nhan - vd: /leads?key=xxxx
 // MVP dung 1 key don gian, ban that nen doi sang dang nhap/JWT
-app.get('/leads', (req, res) => {
+app.get('/leads', async (req, res) => {
   if (req.query.key !== process.env.ADMIN_KEY) {
     return res.status(401).json({ error: 'Sai key' });
   }
-  res.json(loadLeads());
+  try {
+    res.json(await loadLeads());
+  } catch (err) {
+    console.error('Loi doc lead:', err.message);
+    res.status(500).json({ error: 'Khong doc duoc danh sach lead' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
@@ -89,7 +118,10 @@ app.listen(PORT, () => {
   console.log(`Server dang chay o port ${PORT}`);
 });
 
-// Tu dong lam moi Zalo access_token moi 20 tieng (truoc khi het han ~25h)
-setInterval(() => {
-  refreshAccessToken().catch((err) => console.error('Loi refresh token dinh ky:', err.message));
-}, 20 * 60 * 60 * 1000);
+// Tu dong lam moi Zalo access_token moi 20 tieng (truoc khi het han ~25h).
+// Chi chay khi da cau hinh Zalo (co ZALO_APP_ID) de tranh loi vo nghia khi chi chay demo.
+if (process.env.ZALO_APP_ID) {
+  setInterval(() => {
+    refreshAccessToken().catch((err) => console.error('Loi refresh token dinh ky:', err.message));
+  }, 20 * 60 * 60 * 1000);
+}
