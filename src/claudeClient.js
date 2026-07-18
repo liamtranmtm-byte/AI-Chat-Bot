@@ -46,8 +46,8 @@ QUY TẮC BẮT BUỘC:
    ảnh sẽ giúp khách, hãy thêm vào CUỐI câu trả lời, trên một dòng riêng, đúng marker:
    [[IMG:<ID>]]  (thay <ID> bằng đúng mã sản phẩm trong danh sách, ví dụ [[IMG:RL001]]).
    Chỉ gắn MỘT marker ảnh, và chỉ cho mẫu CÒN HÀNG. Nếu đang nói về nhiều mẫu thì không gắn.
-   Nếu mẫu đó có ghi "Co clip san pham" và khách muốn xem thêm, có thể gắn thêm marker
-   [[CLIP:<ID>]] (cùng dòng riêng ở cuối) để gửi clip. Chỉ gắn khi mẫu thật sự có clip.
+   Nếu mẫu đó có ghi "Co clip san pham", hãy CHỦ ĐỘNG mời khách xem clip và gắn thêm marker
+   [[CLIP:<ID>]] (trên dòng riêng ở cuối). Chỉ gắn khi mẫu thật sự có ghi "Co clip san pham".
 4. CHUYỂN NHÂN VIÊN THẬT: Nếu khách tỏ ra bực bội/phàn nàn, hoặc hỏi ngoài phạm vi dữ liệu
    (không trả lời được bằng thông tin đã có), hoặc khách chủ động đòi gặp người thật -> KHÔNG
    trả lời bừa. Thay vào đó nói: "Dạ, để em chuyển anh/chị cho nhân viên tư vấn trực tiếp hỗ
@@ -119,16 +119,20 @@ async function getAIReply(userId, userMessage) {
   // Luu ban da lam sach marker vao lich su (tranh model bat chuoc marker lung tung)
   history.push({ role: 'assistant', content: reply });
 
-  // Chi gui anh khi tim thay san pham dang con hang va co anh that
+  // Chi gui anh khi tim thay san pham dang con hang va co anh that.
+  // Neu mau do co clip -> tu dong dinh kem clip luon (khong phu thuoc bot phat marker CLIP).
   let imageUrl = null;
+  let clipUrl = null;
   if (productId) {
     const product = await getProductById(productId);
-    if (product && product.inStock) imageUrl = await resolveImageUrl(product);
+    if (product && product.inStock) {
+      imageUrl = await resolveImageUrl(product);
+      if (product.clip) clipUrl = product.clip;
+    }
   }
 
-  // Clip san pham (neu mau co cot Link clip)
-  let clipUrl = null;
-  if (clipId) {
+  // Marker CLIP tuong minh (neu bot chu dong gan cho 1 mau co clip)
+  if (!clipUrl && clipId) {
     const product = await getProductById(clipId);
     if (product && product.clip) clipUrl = product.clip;
   }
