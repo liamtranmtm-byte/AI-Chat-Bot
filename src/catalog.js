@@ -38,20 +38,62 @@ function looksLikeHeader(row) {
   return !hasPriceDigits && /ten|mau|mẫu|name/.test(secondCell);
 }
 
-function rowToProduct(row) {
-  const [id, name, brand, price, condition, stock, description, image, clip] = row;
+// Chuan hoa ten header: bo dau, thuong hoa, gop khoang trang.
+function normalizeHeader(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Cac ten cot chap nhan cho tung truong (khong dau). Nho cach nay, chu shop co the
+// dat ten cot / sap xep tuy y, mien la tieu de khop 1 trong cac alias duoi day.
+const HEADER_ALIASES = {
+  id: ['id', 'ma', 'ma sp', 'ma san pham'],
+  name: ['ten mau', 'ten', 'mau', 'name', 'ten san pham'],
+  brand: ['hang', 'brand', 'thuong hieu'],
+  price: ['gia', 'gia vnd', 'gia (vnd)', 'price', 'gia ban'],
+  condition: ['tinh trang', 'condition'],
+  stock: ['con hang', 'ton kho', 'stock', 'tinh trang kho'],
+  description: ['mo ta', 'description', 'ghi chu'],
+  image: ['link anh', 'anh', 'hinh', 'hinh anh', 'image', 'link hinh'],
+  clip: ['link clip', 'clip', 'video', 'link video'],
+};
+
+// Tu dong tieu de -> map { truong: chi so cot } (dua theo TEN cot, khong theo vi tri).
+function buildColumnMap(headerRow) {
+  const norm = (headerRow || []).map(normalizeHeader);
+  const map = {};
+  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    map[field] = norm.findIndex((h) => aliases.includes(h));
+  }
+  return map;
+}
+
+function cell(row, idx) {
+  return idx >= 0 ? String(row[idx] || '').trim() : '';
+}
+
+// colMap != null: doc theo TEN cot (linh hoat). colMap == null: doc theo VI TRI A..I.
+function rowToProduct(row, colMap) {
+  let id, name, brand, price, condition, stock, description, image, clip;
+  if (colMap) {
+    id = cell(row, colMap.id); name = cell(row, colMap.name); brand = cell(row, colMap.brand);
+    price = cell(row, colMap.price); condition = cell(row, colMap.condition);
+    stock = cell(row, colMap.stock); description = cell(row, colMap.description);
+    image = cell(row, colMap.image); clip = cell(row, colMap.clip);
+  } else {
+    [id, name, brand, price, condition, stock, description, image, clip] =
+      row.map((x) => String(x || '').trim());
+  }
   if (!id && !name) return null; // bo qua dong trong
-  if (String(id || '').trim().toLowerCase() === 'id') return null; // bo dong header lot vao
+  if (id.toLowerCase() === 'id') return null; // bo dong header lot vao
   return {
-    id: String(id || '').trim(),
-    name: String(name || '').trim(),
-    brand: String(brand || '').trim(),
+    id, name, brand,
     price: formatPrice(price),
-    condition: String(condition || '').trim(),
+    condition,
     inStock: parseInStock(stock),
-    description: String(description || '').trim(),
-    image: String(image || '').trim(),
-    clip: String(clip || '').trim(),
+    description, image, clip,
   };
 }
 
@@ -88,9 +130,11 @@ async function fetchFromSheet() {
   const rows = res.data.values || [];
   if (!rows.length) return null;
 
-  // Bo dong header neu co; Sheet khong header thi giu nguyen tu dong dau
-  const dataRows = looksLikeHeader(rows[0]) ? rows.slice(1) : rows;
-  const products = dataRows.map(rowToProduct).filter(Boolean);
+  // Co header -> doc theo TEN cot (linh hoat vi tri). Khong header -> doc theo vi tri A..I.
+  const hasHeader = looksLikeHeader(rows[0]);
+  const colMap = hasHeader ? buildColumnMap(rows[0]) : null;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const products = dataRows.map((r) => rowToProduct(r, colMap)).filter(Boolean);
   return products.length ? products : null;
 }
 
