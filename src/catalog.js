@@ -132,4 +132,20 @@ async function getProductById(id) {
   return products.find((p) => p.id.toLowerCase() === target) || null;
 }
 
-module.exports = { getProducts, getProfileText, getProductById };
+// Do trong 1 doan text (thuong la cau tra loi cua bot) xem co nhac dich danh MOT
+// san pham nao khong (theo ma hoac ten day du). Tra ve san pham do neu khop DUY NHAT,
+// nguoc lai null (0 hoac nhieu -> khong ro rang). Dung de tu dinh anh/clip khi bot
+// khong phat marker.
+async function detectProduct(text) {
+  if (!text) return null;
+  const t = String(text).toLowerCase();
+  const products = await getProducts();
+  const matches = products.filter((p) => {
+    const byId = p.id && t.includes(p.id.toLowerCase());
+    const byName = p.name && t.includes(p.name.toLowerCase());
+    return byId || byName;
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+module.exports = { getProducts, getProfileText, getProductById, detectProduct };

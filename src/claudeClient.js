@@ -1,4 +1,4 @@
-const { getProfileText, getProductById } = require('./catalog');
+const { getProfileText, getProductById, detectProduct } = require('./catalog');
 const driveImages = require('./driveImages');
 
 // Link test (placehold.co) khong tinh la anh that -> bo qua de dung anh Drive.
@@ -119,25 +119,25 @@ async function getAIReply(userId, userMessage) {
   // Luu ban da lam sach marker vao lich su (tranh model bat chuoc marker lung tung)
   history.push({ role: 'assistant', content: reply });
 
-  // Chi gui anh khi tim thay san pham dang con hang va co anh that.
-  // Neu mau do co clip -> tu dong dinh kem clip luon (khong phu thuoc bot phat marker CLIP).
+  // Xac dinh mau dang duoc noi toi: uu tien marker [[IMG:ID]] bot phat, neu khong co
+  // thi TU DO trong cau tra loi (bot hay quen gan marker). Co mau -> dinh anh + clip.
+  let product = productId ? await getProductById(productId) : null;
+  if (!product) product = await detectProduct(reply);
+
   let imageUrl = null;
   let clipUrl = null;
-  if (productId) {
-    const product = await getProductById(productId);
-    if (product && product.inStock) {
-      imageUrl = await resolveImageUrl(product);
-      if (product.clip) clipUrl = product.clip;
-    }
+  if (product && product.inStock) {
+    imageUrl = await resolveImageUrl(product);
+    if (product.clip) clipUrl = product.clip;
   }
 
   // Marker CLIP tuong minh (neu bot chu dong gan cho 1 mau co clip)
   if (!clipUrl && clipId) {
-    const product = await getProductById(clipId);
-    if (product && product.clip) clipUrl = product.clip;
+    const clipProduct = await getProductById(clipId);
+    if (clipProduct && clipProduct.clip) clipUrl = clipProduct.clip;
   }
 
-  return { reply, imageUrl, clipUrl, productId, handoff };
+  return { reply, imageUrl, clipUrl, productId: product ? product.id : productId, handoff };
 }
 
 // System prompt rieng cho ca khach GUI ANH nho dinh gia / thu mua.
