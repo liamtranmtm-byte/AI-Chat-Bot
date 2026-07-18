@@ -38,47 +38,74 @@ xin "OA thử nghiệm kỹ thuật" qua email oa@zalo.me để test trước kh
 ```
 Khách nhắn (Zalo that HOẶC trang /demo)
         ↓
-src/server.js (Express)
+src/server.js (Express)  ── chặn spam (src/rateLimiter.js, 10 tin/60s/user)
         ↓
 src/claudeClient.js → gọi Anthropic API (model: claude-sonnet-5)
-        kèm system prompt = SYSTEM_PROMPT + STWATCH_PROFILE (src/data/stwatchProfile.js)
+        system prompt = BASE_SYSTEM (có dấu, quy tắc hết hàng/ảnh/handoff)
+                       + SHOP_INFO (src/data/stwatchProfile.js)
+                       + catalog động đọc từ Google Sheet (src/catalog.js, cache 5')
+        bot phát marker [[IMG:<ID>]] / [[HANDOFF]] -> server tách ra xử lý
         ↓
-Trả lời → (Zalo that: src/zaloClient.js gửi qua Zalo Send API)
-          (Demo: trả thẳng JSON cho public/index.html hiển thị)
+Trả lời → (Zalo that: src/zaloClient.js gửi text + ảnh qua Zalo Send API)
+          (Demo: trả JSON {reply, imageUrl, handoff} cho public/index.html)
         ↓
-src/leadExtractor.js chạy ngầm, phân tích hội thoại, trích JSON lead
+Ảnh sản phẩm: src/driveImages.js lấy từ folder Google Drive (tên file = mã SP),
+              phục vụ qua route /img/<ID> (ổn định cho cả Zalo lẫn demo)
         ↓
-src/leadStore.js ghi vào leads.json nếu có lead thật
+src/leadExtractor.js chạy ngầm, trích JSON lead
+        ↓
+src/leadStore.js ghi lead vào Google Sheet tab "Leads" (fallback leads.json)
 ```
 
 **File quan trọng:**
-- `src/server.js` — Express app, có 4 route: `/webhook` (Zalo that), `/demo-chat` (API cho demo),
-  `/demo` (serve trang tĩnh `public/index.html`), `/leads?key=...` (xem lead, bảo vệ bằng ADMIN_KEY)
-- `src/data/stwatchProfile.js` — **kiến thức nghiệp vụ của STWatch, cần cập nhật thường xuyên**
-  khi đổi giá/mẫu mới. Đây là phần quyết định bot có hữu ích hay không, quan trọng hơn code.
-- `src/zaloClient.js` — refresh token Zalo (hết hạn ~25h) + gửi tin nhắn qua Zalo Send API
-- `public/index.html` — giao diện demo, thiết kế riêng tông đồng hồ cao cấp (đen/vàng/đỏ),
-  không phụ thuộc Zalo
-- `README.md` — hướng dẫn setup đầy đủ, gồm cả các bước Zalo OA (đọc phần "Demo nhanh — không
-  cần Zalo" trước tiên)
+- `src/server.js` — Express app: `/webhook` (Zalo), `/demo-chat` (API demo), `/demo` (trang tĩnh),
+  `/img/<ID>` (ảnh sản phẩm từ Drive), `/leads?key=...` (xem lead, bảo vệ bằng ADMIN_KEY)
+- `src/catalog.js` — **đọc catalog từ Google Sheet** + cache + build profile cho bot. Dữ liệu
+  sản phẩm (giá/mẫu/tồn kho) giờ nằm trong Sheet, KHÔNG gõ cứng nữa — chủ shop tự sửa Sheet.
+- `src/data/stwatchProfile.js` — chỉ còn **thông tin cửa hàng cố định** (địa chỉ, dịch vụ) +
+  fallback tĩnh khi chưa cấu hình Google.
+- `src/googleClient.js` — xác thực Service Account (Sheets + Drive)
+- `src/driveImages.js` — lấy ảnh sản phẩm từ folder Drive theo mã, phục vụ qua `/img/<ID>`
+- `src/rateLimiter.js` — chặn spam
+- `src/leadExtractor.js` + `src/leadStore.js` — trích lead + ghi vào Google Sheet tab "Leads"
+- `src/claudeClient.js` — gọi Claude, prompt hành vi (có dấu), xử lý marker ảnh/handoff
+- `src/zaloClient.js` — refresh token Zalo (~25h) + gửi text/ảnh qua Zalo Send API
+- `public/index.html` — giao diện demo (tông đồng hồ cao cấp), hiển thị ảnh + cờ handoff
+- `README.md` — hướng dẫn setup đầy đủ (đọc "Demo nhanh — không cần Zalo" + "Nâng cấp Giai đoạn 1")
 
 ## Trạng thái hiện tại
 
-- ✅ Code đã lên GitHub
-- ⬜ Chưa deploy lên Render
+- ✅ Code đã lên GitHub (branch `claude/git-init-add-commit-push-3jkfpv`)
+- ✅ **Đã deploy Render** (`ai-chat-bot-oqzq.onrender.com`) — demo chạy thật
+- ✅ **Google Sheet nối thông**: catalog + lead (tab "Leads") + ảnh sản phẩm (folder Drive)
 - ⬜ Chưa đụng tới Zalo OA thật (đúng chủ đích — chỉ làm sau khi có khách chốt)
 - ✅ Đã có file pitch "De-xuat-hop-tac-STWatch.docx" và danh sách 16 khách hàng tiềm năng
   (lưu ngoài repo, không phải file code)
 
-## Việc cần làm tiếp theo
+## Giai đoạn 1 — ĐÃ HOÀN THÀNH (đã test trên bản deploy)
 
-1. Deploy repo này lên Render (Build: `npm install`, Start: `npm start`)
-2. Set biến môi trường tối thiểu: `ANTHROPIC_API_KEY` (từ console.anthropic.com), `ADMIN_KEY`
-   (tự đặt). Biến `ZALO_*` để trống — chưa cần.
-3. Set spend limit cho Anthropic API key (Settings → Billing) để tránh phát sinh chi phí ngoài ý
-   muốn khi test.
-4. Mở `https://<ten-app>.onrender.com/demo` để test, chỉnh `src/data/stwatchProfile.js` tới khi
-   bot trả lời đúng ý.
-5. Dùng link demo đó + file pitch để tiếp cận STWatch và các shop trong danh sách dự phòng.
-6. CHỈ khi có khách đồng ý dùng thật mới quay lại xử lý phần Zalo OA (README có hướng dẫn chi
-   tiết mục "OA thử nghiệm kỹ thuật" và đăng ký gói Tăng trưởng).
+1. ✅ Catalog đọc từ Google Sheet (cache 5'), không còn gõ cứng
+2. ✅ Bot gửi kèm ảnh khi khách hỏi 1 mẫu cụ thể còn hàng — ảnh thật từ folder Drive
+   (tên file = mã SP), phục vụ qua `/img/<ID>`; link `placehold.co` bị bỏ qua
+3. ✅ Xử lý hết hàng: báo hết hàng + gợi ý mẫu tương tự, không gửi ảnh mẫu đã hết
+4. ✅ Chuyển nhân viên thật (handoff) khi khách bực/hỏi ngoài dữ liệu/đòi gặp người
+5. ✅ Chống spam: 10 tin/60s mỗi user
+6. ✅ Lead ghi vào Google Sheet tab "Leads"
+   Cộng thêm: bot trả lời tiếng Việt CÓ DẤU.
+
+**Config cần cho vận hành (đã set trên Render):** `ANTHROPIC_API_KEY`, `ADMIN_KEY`,
+`GOOGLE_SERVICE_ACCOUNT_JSON`, `CATALOG_SHEET_ID`, `DRIVE_IMAGE_FOLDER_ID`. Chi tiết ở README
+mục "Nâng cấp Giai đoạn 1". Ảnh hiện là ảnh minh hoạ có nhãn — cần thay bằng ảnh thật của shop.
+
+## Việc cần làm tiếp theo (Giai đoạn 2 — backlog, chưa chốt ưu tiên)
+
+- Clip sản phẩm: thêm cột "Link clip" trong Sheet; bot gửi link/nhúng clip (demo nhúng,
+  Zalo gửi link TikTok/YouTube)
+- Khách gửi ảnh nhờ định giá: nhận ảnh khách gửi, dùng Claude vision ước lượng / hỏi thêm
+  thông tin rồi chuyển nhân viên thẩm định
+- Quick-reply (nút bấm nhanh) trong Zalo thay vì gõ tay
+- Multi-tenant: 1 hệ thống phục vụ nhiều shop (mỗi shop 1 Sheet/OA riêng)
+- Thông báo lead/handoff cho nhân viên theo thời gian thực (email/Zalo nội bộ)
+
+**Nguyên tắc giữ nguyên:** CHỈ khi có khách đồng ý dùng thật mới xử lý Zalo OA thật (README có
+mục "OA thử nghiệm kỹ thuật" + gói Tăng trưởng). Không tự ý mở rộng ngoài phạm vi đã chốt.
