@@ -79,7 +79,8 @@ src/leadStore.js ghi lead vào Google Sheet tab "Leads" (fallback leads.json)
 - ✅ **Đã deploy Render** (`ai-chat-bot-oqzq.onrender.com`) — demo chạy thật
 - ✅ **Google Sheet nối thông**: catalog + lead (tab "Leads") + ảnh sản phẩm (folder Drive)
 - ⬜ Chưa đụng tới Zalo OA thật (đúng chủ đích — chỉ làm sau khi có khách chốt)
-- ✅ Đã có file pitch "De-xuat-hop-tac-STWatch.docx" và danh sách 16 khách hàng tiềm năng
+- ✅ Đã có file pitch "De-xuat-hop-tac-STWatch.docx", slide thuyết trình tính năng
+  "STWatch-TroLyAI.pptx" (9 slide), và danh sách 16 khách hàng tiềm năng
   (lưu ngoài repo, không phải file code)
 
 ## Giai đoạn 1 — ĐÃ HOÀN THÀNH (đã test trên bản deploy)
