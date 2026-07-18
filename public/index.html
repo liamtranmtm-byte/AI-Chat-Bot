@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STWatch — Demo Trợ Lý AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #100f0b;
+    --bg-vignette: radial-gradient(circle at 50% 15%, #1c1a13 0%, #100f0b 60%);
+    --surface: #1d1b15;
+    --surface-border: #322d20;
+    --gold: #c9a24b;
+    --gold-dim: #8a7538;
+    --red: #d60605;
+    --cream: #ede6d8;
+    --muted: #8a8272;
+    --radius: 18px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg-vignette);
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: var(--cream);
+  }
+  body{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:100vh; padding: 32px 16px;
+  }
+  .caption{
+    max-width: 420px;
+    text-align:center;
+    color: var(--muted);
+    font-size: 13px;
+    line-height:1.5;
+    margin-bottom: 18px;
+    letter-spacing:.01em;
+  }
+  .caption b{ color: var(--gold); font-weight:500; }
+
+  .phone{
+    width: 100%;
+    max-width: 420px;
+    height: min(78vh, 720px);
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 28px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(201,162,75,.06);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    position:relative;
+  }
+
+  .header{
+    display:flex; align-items:center; gap:12px;
+    padding: 18px 18px 16px;
+    border-bottom: 1px solid var(--surface-border);
+    background: linear-gradient(180deg, #201d16, #1d1b15);
+  }
+  .avatar{
+    width:40px; height:40px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #e3c374, var(--gold-dim));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:600; font-size:15px; color:#1a1710;
+    flex-shrink:0;
+    position:relative;
+  }
+  .title-block{ flex:1; min-width:0; }
+  .title-block h1{
+    font-family:'Fraunces', serif; font-weight:600; font-size:17px;
+    margin:0; color: var(--cream); letter-spacing:.01em;
+  }
+  .status{
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; color: var(--muted); margin-top:2px;
+  }
+  .status .dot{
+    width:6px; height:6px; border-radius:50%; background:#5bc26a;
+    box-shadow: 0 0 0 0 rgba(91,194,106,.5);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(91,194,106,.45); }
+    70%{ box-shadow: 0 0 0 6px rgba(91,194,106,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(91,194,106,0); }
+  }
+
+  /* signature element: kim giay dong ho quay lien tuc, goc header */
+  .watch-tick{
+    width:22px; height:22px; border-radius:50%;
+    border: 1px solid var(--gold-dim);
+    position:relative; flex-shrink:0;
+  }
+  .watch-tick::before{
+    content:''; position:absolute; top:50%; left:50%;
+    width:1px; height:8px; background: var(--gold);
+    transform-origin: bottom center;
+    transform: translate(-50%, -100%) rotate(0deg);
+    animation: tick 60s linear infinite;
+  }
+  @keyframes tick{ to{ transform: translate(-50%, -100%) rotate(360deg); } }
+
+  .messages{
+    flex:1; overflow-y:auto;
+    padding: 18px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .messages::-webkit-scrollbar{ width:6px; }
+  .messages::-webkit-scrollbar-thumb{ background: var(--surface-border); border-radius:3px; }
+
+  .bubble{
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14.5px;
+    line-height:1.5;
+    white-space: pre-wrap;
+    animation: rise .25s ease;
+  }
+  @keyframes rise{ from{ opacity:0; transform: translateY(6px);} to{opacity:1; transform:none;} }
+
+  .bubble.bot{
+    align-self:flex-start;
+    background:#242019;
+    border: 1px solid var(--surface-border);
+    border-left: 2px solid var(--gold);
+    color: var(--cream);
+    border-bottom-left-radius:4px;
+  }
+  .bubble.user{
+    align-self:flex-end;
+    background: var(--red);
+    color: #fdeceb;
+    border-bottom-right-radius:4px;
+  }
+  .bubble.system{
+    align-self:center;
+    background:transparent;
+    color: var(--muted);
+    font-size:12px;
+    font-family:'IBM Plex Mono', monospace;
+    max-width:100%;
+    text-align:center;
+  }
+
+  .typing{
+    align-self:flex-start;
+    display:flex; gap:4px;
+    padding: 12px 14px;
+    background:#242019;
+    border: 1px solid var(--surface-border);
+    border-left: 2px solid var(--gold);
+    border-radius: var(--radius);
+    border-bottom-left-radius:4px;
+  }
+  .typing span{
+    width:6px; height:6px; border-radius:50%; background: var(--muted);
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2){ animation-delay:.15s; }
+  .typing span:nth-child(3){ animation-delay:.3s; }
+  @keyframes bounce{ 0%,60%,100%{ transform: translateY(0); opacity:.5;} 30%{ transform: translateY(-4px); opacity:1;} }
+
+  .composer{
+    display:flex; gap:8px;
+    padding: 14px;
+    border-top: 1px solid var(--surface-border);
+    background: #181611;
+  }
+  .composer input{
+    flex:1;
+    background:#221f18;
+    border: 1px solid var(--surface-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: var(--cream);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    outline:none;
+  }
+  .composer input::placeholder{ color: var(--muted); }
+  .composer input:focus{ border-color: var(--gold-dim); }
+  .composer button{
+    width:42px; height:42px; border-radius:50%; flex-shrink:0;
+    background: var(--red); border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: transform .12s ease, opacity .12s ease;
+  }
+  .composer button:hover{ transform: scale(1.05); }
+  .composer button:disabled{ opacity:.4; cursor:default; transform:none; }
+  .composer button svg{ width:18px; height:18px; }
+
+  .composer button:focus-visible, .composer input:focus-visible{
+    outline: 2px solid var(--gold); outline-offset:2px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .watch-tick::before, .status .dot, .typing span{ animation: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="caption">
+    Demo minh hoạ cách <b>Trợ lý AI</b> trả lời khách — chạy độc lập, không cần chờ tích hợp Zalo.
+    Thử hỏi: <i>"Rolex Datejust giá bao nhiêu"</i> hoặc <i>"shop ở đâu"</i>.
+  </div>
+
+  <div class="phone">
+    <div class="header">
+      <div class="avatar">ST</div>
+      <div class="title-block">
+        <h1>STWatch</h1>
+        <div class="status"><span class="dot"></span> Trợ lý AI · đang hoạt động</div>
+      </div>
+      <div class="watch-tick" aria-hidden="true"></div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="bubble system">Hôm nay</div>
+      <div class="bubble bot">Chào anh/chị 👋 Em là trợ lý của STWatch. Anh/chị đang quan tâm mẫu đồng hồ nào ạ?</div>
+    </div>
+
+    <div class="composer">
+      <input id="input" type="text" placeholder="Nhập tin nhắn..." autocomplete="off">
+      <button id="send" aria-label="Gửi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fdeceb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+<script>
+  const userId = 'demo-' + Math.random().toString(36).slice(2, 10);
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  function addBubble(text, who){
+    const el = document.createElement('div');
+    el.className = 'bubble ' + who;
+    el.textContent = text;
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return el;
+  }
+
+  function showTyping(){
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.id = 'typing-indicator';
+    el.innerHTML = '<span></span><span></span><span></span>';
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function hideTyping(){
+    const el = document.getElementById('typing-indicator');
+    if(el) el.remove();
+  }
+
+  async function sendMessage(){
+    const text = inputEl.value.trim();
+    if(!text) return;
+
+    addBubble(text, 'user');
+    inputEl.value = '';
+    inputEl.disabled = true;
+    sendBtn.disabled = true;
+    showTyping();
+
+    try{
+      const res = await fetch('/demo-chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ userId, message: text })
+      });
+      const data = await res.json();
+      hideTyping();
+      addBubble(data.reply || 'Xin lỗi, em chưa nhận được phản hồi. Anh/chị thử lại giúp em nhé.', 'bot');
+    }catch(err){
+      hideTyping();
+      addBubble('Không kết nối được tới server. Kiểm tra lại backend đã chạy chưa.', 'bot');
+    }finally{
+      inputEl.disabled = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') sendMessage();
+  });
+  inputEl.focus();
+</script>
+</body>
+</html>
