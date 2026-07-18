@@ -6,6 +6,7 @@ const { sendTextMessage, sendImageMessage, refreshAccessToken } = require('./zal
 const { extractLead } = require('./leadExtractor');
 const { appendLead, loadLeads } = require('./leadStore');
 const { checkRate } = require('./rateLimiter');
+const { streamImage } = require('./driveImages');
 
 const app = express();
 app.use(express.json());
@@ -20,6 +21,18 @@ app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));
 // Trang demo chat doc lap, khong dung Zalo - dung de pitch khach truoc khi
 // ho can tra tien goi Zalo OA. Sau khi deploy, mo: https://ten-app.onrender.com/demo
 app.use('/demo', express.static(path.join(__dirname, '..', 'public')));
+
+// Phuc vu anh san pham that (lay tu folder Google Drive theo ma san pham).
+// URL nay duoc gui cho khach (demo + Zalo) thay vi hotlink truc tiep Drive.
+app.get('/img/:id', async (req, res) => {
+  try {
+    const ok = await streamImage(req.params.id, res);
+    if (!ok && !res.headersSent) res.status(404).send('Khong tim thay anh');
+  } catch (err) {
+    console.error('Loi phuc vu anh:', err.message);
+    if (!res.headersSent) res.status(500).send('Loi tai anh');
+  }
+});
 
 // Endpoint dung rieng cho trang demo - tai su dung dung 1 bo nao AI voi ban Zalo that,
 // chi khac o cho khong goi Zalo. Tra ve them imageUrl (neu bot muon khoe anh) va handoff.

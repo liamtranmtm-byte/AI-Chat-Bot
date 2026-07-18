@@ -11,9 +11,14 @@
 
 const { google } = require('googleapis');
 
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.readonly', // doc anh san pham tu folder Drive
+];
 
-let cachedClient; // undefined = chua thu; null = da thu nhung khong cau hinh
+let cachedAuth;   // undefined = chua thu; null = khong cau hinh
+let cachedSheets;
+let cachedDrive;
 
 function readCredentials() {
   const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -37,30 +42,44 @@ function readCredentials() {
   return null;
 }
 
-// Tra ve sheets client da xac thuc, hoac null neu chua cau hinh Service Account.
-function getSheets() {
-  if (cachedClient !== undefined) return cachedClient;
+// Tra ve JWT auth da xac thuc (dung chung cho Sheets + Drive), hoac null neu chua cau hinh.
+function getAuth() {
+  if (cachedAuth !== undefined) return cachedAuth;
 
   const creds = readCredentials();
   if (!creds || !creds.client_email || !creds.private_key) {
     console.warn('Chua cau hinh Google Service Account - se fallback (catalog tinh, lead ghi file).');
-    cachedClient = null;
+    cachedAuth = null;
     return null;
   }
 
-  const auth = new google.auth.JWT({
+  cachedAuth = new google.auth.JWT({
     email: creds.client_email,
     key: creds.private_key,
     scopes: SCOPES,
   });
+  console.log(`Google Service Account san sang: ${creds.client_email}`);
+  return cachedAuth;
+}
 
-  cachedClient = google.sheets({ version: 'v4', auth });
-  console.log(`Google Sheets client san sang (service account: ${creds.client_email})`);
-  return cachedClient;
+// Tra ve sheets client da xac thuc, hoac null neu chua cau hinh.
+function getSheets() {
+  if (cachedSheets !== undefined) return cachedSheets;
+  const auth = getAuth();
+  cachedSheets = auth ? google.sheets({ version: 'v4', auth }) : null;
+  return cachedSheets;
+}
+
+// Tra ve drive client da xac thuc, hoac null neu chua cau hinh.
+function getDrive() {
+  if (cachedDrive !== undefined) return cachedDrive;
+  const auth = getAuth();
+  cachedDrive = auth ? google.drive({ version: 'v3', auth }) : null;
+  return cachedDrive;
 }
 
 function isConfigured() {
-  return getSheets() !== null;
+  return getAuth() !== null;
 }
 
-module.exports = { getSheets, isConfigured };
+module.exports = { getAuth, getSheets, getDrive, isConfigured };

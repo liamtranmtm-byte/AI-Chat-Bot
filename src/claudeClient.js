@@ -1,4 +1,22 @@
 const { getProfileText, getProductById } = require('./catalog');
+const driveImages = require('./driveImages');
+
+// Link test (placehold.co) khong tinh la anh that -> bo qua de dung anh Drive.
+function isPlaceholder(url) {
+  return /placehold\.co/i.test(url || '');
+}
+
+// Chon URL anh gui cho khach:
+//  1. Link that dat tay trong cot "Link anh" cua Sheet (bo qua link placeholder)
+//  2. Anh that trong folder Drive, khop theo ma san pham -> proxy qua /img/<ID>
+//  3. Khong co anh that -> null (khong gui anh placeholder)
+async function resolveImageUrl(product) {
+  if (product.image && !isPlaceholder(product.image)) return product.image;
+  if (driveImages.isConfigured() && await driveImages.hasImage(product.id)) {
+    return driveImages.imageProxyUrl(product.id);
+  }
+  return null;
+}
 
 // Luu lich su hoi thoai ngan han theo tung user (trong RAM, mat khi restart server).
 // Voi luong nguoi dung lon hon, nen chuyen sang luu vao Redis/DB.
@@ -93,11 +111,11 @@ async function getAIReply(userId, userMessage) {
   // Luu ban da lam sach marker vao lich su (tranh model bat chuoc marker lung tung)
   history.push({ role: 'assistant', content: reply });
 
-  // Chi gui anh khi tim thay san pham va no dang con hang va co Link anh
+  // Chi gui anh khi tim thay san pham dang con hang va co anh that
   let imageUrl = null;
   if (productId) {
     const product = await getProductById(productId);
-    if (product && product.inStock && product.image) imageUrl = product.image;
+    if (product && product.inStock) imageUrl = await resolveImageUrl(product);
   }
 
   return { reply, imageUrl, productId, handoff };
