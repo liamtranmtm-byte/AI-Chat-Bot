@@ -156,6 +156,29 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
+// Chan doan: xem chinh xac catalog server doc duoc tu Sheet (co cot clip khong?).
+// Vd: /debug/catalog?key=ADMIN_KEY
+app.get('/debug/catalog', async (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Sai key' });
+  }
+  try {
+    const { getProducts } = require('./catalog');
+    const { isConfigured } = require('./driveImages');
+    const products = await getProducts();
+    res.json({
+      driveImageConfigured: isConfigured(),
+      count: products.length,
+      products: products.map((p) => ({
+        id: p.id, name: p.name, inStock: p.inStock,
+        image: p.image || '', hasClip: Boolean(p.clip), clip: p.clip || '',
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Xem danh sach lead da ghi nhan - vd: /leads?key=xxxx
 // MVP dung 1 key don gian, ban that nen doi sang dang nhap/JWT
 app.get('/leads', async (req, res) => {
