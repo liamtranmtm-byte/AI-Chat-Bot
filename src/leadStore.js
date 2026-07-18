@@ -8,7 +8,7 @@ const { getSheets } = require('./googleClient');
 
 const LEADS_FILE = path.join(__dirname, '..', 'leads.json');
 const LEADS_SHEET_ID = process.env.LEADS_SHEET_ID || process.env.CATALOG_SHEET_ID
-  || '1KvKyXhIE5UV3UueSejjEJ8RZvp3D_DXl-xpWvefACTs';
+  || '1RbHSYnAUKQXIY-2c1iw_NVSDclKUdCO2ss4HNr1RsgU';
 const LEADS_TAB = process.env.LEADS_TAB || 'Leads';
 
 const HEADER = ['Thoi gian', 'Nguon', 'User ID', 'Ten', 'SDT', 'Mau quan tam',

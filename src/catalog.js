@@ -8,7 +8,7 @@
 const { getSheets } = require('./googleClient');
 const { SHOP_INFO, STATIC_CATALOG_FALLBACK } = require('./data/stwatchProfile');
 
-const SHEET_ID = process.env.CATALOG_SHEET_ID || '1KvKyXhIE5UV3UueSejjEJ8RZvp3D_DXl-xpWvefACTs';
+const SHEET_ID = process.env.CATALOG_SHEET_ID || '1RbHSYnAUKQXIY-2c1iw_NVSDclKUdCO2ss4HNr1RsgU';
 const SHEET_RANGE = process.env.CATALOG_RANGE || 'A:H';
 const CACHE_MS = (Number(process.env.CATALOG_CACHE_MINUTES) || 5) * 60 * 1000;
 
@@ -25,9 +25,22 @@ function parseInStock(value) {
   return !/h[eế]t/i.test(String(value || ''));
 }
 
+// Nhan dien dong tieu de (co Sheet co header, co Sheet khong) de khong lam mat
+// san pham o dong dau. Coi la header neu cot ID ghi "ID" hoac cot gia khong phai so.
+function looksLikeHeader(row) {
+  if (!row) return false;
+  const first = String(row[0] || '').trim().toLowerCase();
+  if (first === 'id') return true;
+  const priceCell = String(row[3] || '');
+  const secondCell = String(row[1] || '').toLowerCase();
+  const hasPriceDigits = /\d/.test(priceCell);
+  return !hasPriceDigits && /ten|mau|mẫu|name/.test(secondCell);
+}
+
 function rowToProduct(row) {
   const [id, name, brand, price, condition, stock, description, image] = row;
   if (!id && !name) return null; // bo qua dong trong
+  if (String(id || '').trim().toLowerCase() === 'id') return null; // bo dong header lot vao
   return {
     id: String(id || '').trim(),
     name: String(name || '').trim(),
@@ -70,9 +83,11 @@ async function fetchFromSheet() {
   });
 
   const rows = res.data.values || [];
-  if (rows.length <= 1) return null; // chi co header hoac rong
+  if (!rows.length) return null;
 
-  const products = rows.slice(1).map(rowToProduct).filter(Boolean);
+  // Bo dong header neu co; Sheet khong header thi giu nguyen tu dong dau
+  const dataRows = looksLikeHeader(rows[0]) ? rows.slice(1) : rows;
+  const products = dataRows.map(rowToProduct).filter(Boolean);
   return products.length ? products : null;
 }
 
