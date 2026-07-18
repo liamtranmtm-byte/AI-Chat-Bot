@@ -1,7 +1,7 @@
 // Goi them 1 lan Claude (rieng biet voi cau tra loi chinh) de "doc" hoi thoai
 // va rut ra thong tin lead dang JSON. Tach rieng khoi cau tra loi chinh de
 // prompt tra loi khach khong bi anh huong boi yeu cau "xuat JSON".
-async function extractLead(userId, history) {
+async function extractLead(userId, history, meta = {}) {
   const recentTurns = history.slice(-6)
     .map((m) => `${m.role === 'user' ? 'Khach' : 'Bot'}: ${m.content}`)
     .join('\n');
@@ -28,12 +28,15 @@ hoac co de lai SDT. Neu chi hoi thong tin chung chung (vd "shop o dau") thi has_
   const data = await res.json();
   const text = data?.content?.find((b) => b.type === 'text')?.text || '{}';
 
+  // Claude doi khi boc JSON trong ```json ... ``` hoac them chu -> lay khoi {...} dau tien.
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+
   try {
-    const parsed = JSON.parse(text);
-    return { userId, ...parsed };
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    return { userId, ...parsed, ...meta };
   } catch (err) {
     console.error('Khong parse duoc JSON lead extraction:', text);
-    return { userId, has_lead: false };
+    return { userId, has_lead: false, ...meta };
   }
 }
 

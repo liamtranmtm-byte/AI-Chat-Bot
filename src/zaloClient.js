@@ -30,9 +30,9 @@ async function refreshAccessToken() {
   return tokens.access_token;
 }
 
-// Gui tin nhan van ban toi 1 user_id cu the (chi gui duoc trong vong 7 ngay
-// ke tu tin nhan gan nhat cua user, day la gioi han cua OA chua xac thuc)
-async function sendTextMessage(userId, text) {
+// Gui 1 message payload toi Zalo OA (tu dong refresh token va thu lai 1 lan neu het han).
+// Chi gui duoc trong vong 7 ngay ke tu tin nhan gan nhat cua user (gioi han OA chua xac thuc).
+async function sendMessage(message) {
   const doSend = async () => {
     const res = await fetch('https://openapi.zalo.me/v3.0/oa/message/cs', {
       method: 'POST',
@@ -40,10 +40,7 @@ async function sendTextMessage(userId, text) {
         'Content-Type': 'application/json',
         access_token: tokens.access_token,
       },
-      body: JSON.stringify({
-        recipient: { user_id: userId },
-        message: { text },
-      }),
+      body: JSON.stringify(message),
     });
     return res.json();
   };
@@ -62,4 +59,32 @@ async function sendTextMessage(userId, text) {
   return result;
 }
 
-module.exports = { refreshAccessToken, sendTextMessage };
+// Gui tin nhan van ban toi 1 user_id cu the.
+async function sendTextMessage(userId, text) {
+  return sendMessage({
+    recipient: { user_id: userId },
+    message: { text },
+  });
+}
+
+// Gui tin nhan ANH (kem caption tuy chon) qua template media cua Zalo OA.
+// imageUrl phai la URL cong khai (Zalo tu tai anh tu URL nay).
+async function sendImageMessage(userId, imageUrl, caption) {
+  if (!imageUrl) return null;
+  const message = {
+    recipient: { user_id: userId },
+    message: {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'media',
+          elements: [{ media_type: 'image', url: imageUrl }],
+        },
+      },
+    },
+  };
+  if (caption) message.message.text = caption;
+  return sendMessage(message);
+}
+
+module.exports = { refreshAccessToken, sendTextMessage, sendImageMessage };

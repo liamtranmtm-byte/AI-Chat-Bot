@@ -147,6 +147,58 @@
     text-align:center;
   }
 
+  /* Anh san pham bot gui kem */
+  .bubble.image{
+    padding:5px;
+    background:#242019;
+    border:1px solid var(--surface-border);
+    border-left:2px solid var(--gold);
+    border-bottom-left-radius:4px;
+  }
+  .bubble.image img{
+    display:block;
+    width:100%;
+    max-width:260px;
+    border-radius:12px;
+  }
+  /* Anh khach gui (nho dinh gia) - ben phai */
+  .bubble.user.image{
+    align-self:flex-end;
+    padding:5px;
+    background: var(--red);
+    border:none;
+    border-bottom-right-radius:4px;
+  }
+  .bubble.user.image img{ max-width:200px; }
+
+  /* Nut xem clip */
+  .clip-link{
+    align-self:flex-start;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px;
+    background:#242019;
+    border:1px solid var(--gold-dim);
+    border-radius:14px;
+    color: var(--gold);
+    text-decoration:none;
+    font-size:14px; font-weight:500;
+    transition: background .12s ease;
+  }
+  .clip-link:hover{ background:#2c2820; }
+
+  /* Thong bao chuyen nhan vien that */
+  .bubble.handoff{
+    align-self:center;
+    max-width:92%;
+    text-align:center;
+    font-size:12px;
+    color: var(--gold);
+    background: rgba(201,162,75,.08);
+    border:1px solid rgba(201,162,75,.25);
+    border-radius:12px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
   .typing{
     align-self:flex-start;
     display:flex; gap:4px;
@@ -194,9 +246,19 @@
   .composer button:disabled{ opacity:.4; cursor:default; transform:none; }
   .composer button svg{ width:18px; height:18px; }
 
-  .composer button:focus-visible, .composer input:focus-visible{
+  .composer button:focus-visible, .composer input:focus-visible, .attach:focus-visible{
     outline: 2px solid var(--gold); outline-offset:2px;
   }
+
+  /* Nut gui anh (dinh gia) */
+  .attach{
+    width:42px; height:42px; border-radius:50%; flex-shrink:0;
+    background:#221f18; border:1px solid var(--surface-border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:19px;
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .attach:hover{ transform: scale(1.05); border-color: var(--gold-dim); }
 
   @media (prefers-reduced-motion: reduce){
     .watch-tick::before, .status .dot, .typing span{ animation: none; }
@@ -207,7 +269,7 @@
 
   <div class="caption">
     Demo minh hoạ cách <b>Trợ lý AI</b> trả lời khách — chạy độc lập, không cần chờ tích hợp Zalo.
-    Thử hỏi: <i>"Rolex Datejust giá bao nhiêu"</i> hoặc <i>"shop ở đâu"</i>.
+    Thử hỏi: <i>"Rolex Datejust 126233 còn không, cho xem ảnh"</i>, hoặc bấm <b>📷</b> gửi ảnh đồng hồ để <b>nhờ định giá</b>.
   </div>
 
   <div class="phone">
@@ -226,6 +288,8 @@
     </div>
 
     <div class="composer">
+      <label class="attach" for="imgInput" role="button" tabindex="0" aria-label="Gửi ảnh nhờ định giá" title="Gửi ảnh đồng hồ nhờ định giá">📷</label>
+      <input id="imgInput" type="file" accept="image/*" hidden>
       <input id="input" type="text" placeholder="Nhập tin nhắn..." autocomplete="off">
       <button id="send" aria-label="Gửi">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fdeceb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -251,6 +315,30 @@
     return el;
   }
 
+  function addImage(url, who){
+    const el = document.createElement('div');
+    el.className = 'bubble image ' + (who || 'bot');
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Anh';
+    img.loading = 'lazy';
+    if(who !== 'user') img.onerror = () => { el.remove(); };
+    el.appendChild(img);
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addClip(url){
+    const a = document.createElement('a');
+    a.className = 'clip-link';
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = '▶  Xem clip sản phẩm';
+    messagesEl.appendChild(a);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   function showTyping(){
     const el = document.createElement('div');
     el.className = 'typing';
@@ -264,34 +352,82 @@
     if(el) el.remove();
   }
 
-  async function sendMessage(){
-    const text = inputEl.value.trim();
-    if(!text) return;
+  function setBusy(b){
+    inputEl.disabled = b; sendBtn.disabled = b;
+    if(!b) inputEl.focus();
+  }
 
-    addBubble(text, 'user');
-    inputEl.value = '';
-    inputEl.disabled = true;
-    sendBtn.disabled = true;
+  // Goi server + hien phan hoi. body = { message } hoac { image, message }
+  async function sendToServer(body){
+    setBusy(true);
     showTyping();
-
     try{
       const res = await fetch('/demo-chat', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ userId, message: text })
+        body: JSON.stringify(Object.assign({ userId }, body))
       });
       const data = await res.json();
       hideTyping();
       addBubble(data.reply || 'Xin lỗi, em chưa nhận được phản hồi. Anh/chị thử lại giúp em nhé.', 'bot');
+      if(data.imageUrl) addImage(data.imageUrl, 'bot');
+      if(data.clipUrl) addClip(data.clipUrl);
+      if(data.handoff) addBubble('→ Đang chuyển cho nhân viên tư vấn trực tiếp', 'handoff');
     }catch(err){
       hideTyping();
       addBubble('Không kết nối được tới server. Kiểm tra lại backend đã chạy chưa.', 'bot');
     }finally{
-      inputEl.disabled = false;
-      sendBtn.disabled = false;
-      inputEl.focus();
+      setBusy(false);
     }
   }
+
+  function sendMessage(){
+    const text = inputEl.value.trim();
+    if(!text) return;
+    addBubble(text, 'user');
+    inputEl.value = '';
+    sendToServer({ message: text });
+  }
+
+  // Thu nho anh truoc khi gui (nhanh + trong gioi han vision cua Claude)
+  function downscaleImage(file, maxSize, quality){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width, height } = img;
+          if(width > height && width > maxSize){ height = Math.round(height * maxSize / width); width = maxSize; }
+          else if(height > maxSize){ width = Math.round(width * maxSize / height); height = maxSize; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleImageSelected(e){
+    const file = e.target.files && e.target.files[0];
+    imgInput.value = '';
+    if(!file) return;
+    let dataUrl;
+    try{ dataUrl = await downscaleImage(file, 1024, 0.85); }
+    catch(err){ addBubble('Không đọc được ảnh, anh/chị thử ảnh khác nhé.', 'bot'); return; }
+
+    addImage(dataUrl, 'user');
+    const caption = inputEl.value.trim();
+    if(caption){ addBubble(caption, 'user'); inputEl.value = ''; }
+    sendToServer({ image: dataUrl, message: caption });
+  }
+
+  const imgInput = document.getElementById('imgInput');
+  imgInput.addEventListener('change', handleImageSelected);
 
   sendBtn.addEventListener('click', sendMessage);
   inputEl.addEventListener('keydown', (e) => {
