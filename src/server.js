@@ -1,19 +1,42 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
-const { getAIReply, getHistory } = require('./claudeClient');
+const { getAIReply, getAIReplyForImage, getHistory } = require('./claudeClient');
 const { sendTextMessage, sendImageMessage, refreshAccessToken } = require('./zaloClient');
 const { extractLead } = require('./leadExtractor');
 const { appendLead, loadLeads } = require('./leadStore');
 const { checkRate } = require('./rateLimiter');
 const { streamImage } = require('./driveImages');
+const { notifyLead } = require('./notifier');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '12mb' })); // du cho anh base64 khach gui o demo
 
 // Cau tra loi mac dinh khi user bi chan spam (khong goi Claude)
 const RATE_LIMIT_REPLY = 'Dạ anh/chị ơi, anh/chị nhắn hơi nhanh nên em xử lý chưa kịp ạ. '
   + 'Anh/chị chờ em vài giây rồi nhắn lại giúp em nhé ạ.';
+
+// Tach base64 tu data URL: "data:image/jpeg;base64,XXXX"
+function parseDataUrl(dataUrl) {
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || '');
+  return m ? { mediaType: m[1], base64: m[2] } : null;
+}
+
+// Trich lead ngam + thong bao nhan vien (khong lam cham viec tra loi khach).
+function handleLeadAndNotify(userId, source, handoff) {
+  extractLead(userId, getHistory(userId), { source, needs_human: handoff })
+    .then((lead) => {
+      if (lead.has_lead) {
+        appendLead(lead);
+        notifyLead(lead);
+        console.log(`Da ghi lead moi tu ${userId}`);
+      } else if (handoff) {
+        // Khach can nguoi that nhung chua de lai thong tin -> van bao nhan vien
+        notifyLead({ userId, source, needs_human: true });
+      }
+    })
+    .catch((err) => console.error('Loi trich xuat/thong bao lead:', err.message));
+}
 
 // Kiem tra server song, dung de test nhanh sau khi deploy
 app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));
@@ -34,13 +57,13 @@ app.get('/img/:id', async (req, res) => {
   }
 });
 
-// Endpoint dung rieng cho trang demo - tai su dung dung 1 bo nao AI voi ban Zalo that,
-// chi khac o cho khong goi Zalo. Tra ve them imageUrl (neu bot muon khoe anh) va handoff.
+// Endpoint dung rieng cho trang demo - tai su dung dung 1 bo nao AI voi ban Zalo that.
+// Nhan { userId, message, image? } - neu co "image" (data URL) -> luong dinh gia qua vision.
 app.post('/demo-chat', async (req, res) => {
   try {
-    const { userId, message } = req.body;
-    if (!userId || !message) {
-      return res.status(400).json({ error: 'Thieu userId hoac message' });
+    const { userId, message, image } = req.body;
+    if (!userId || (!message && !image)) {
+      return res.status(400).json({ error: 'Thieu userId, message hoac image' });
     }
 
     // Chan spam: neu vuot gioi han, tra loi mac dinh, khong goi Claude
@@ -49,22 +72,30 @@ app.post('/demo-chat', async (req, res) => {
       return res.json({ reply: RATE_LIMIT_REPLY, rateLimited: true });
     }
 
-    const { reply, imageUrl, handoff } = await getAIReply(userId, message);
-    res.json({ reply, imageUrl, handoff });
+    let result;
+    if (image) {
+      const parsed = parseDataUrl(image);
+      if (!parsed) return res.status(400).json({ error: 'Anh khong hop le' });
+      result = await getAIReplyForImage(userId, { base64: parsed.base64, mediaType: parsed.mediaType }, message);
+    } else {
+      result = await getAIReply(userId, message);
+    }
 
-    // Ghi lead ngam giong nhu ben Zalo, de demo cung the hien duoc phan nay
-    extractLead(userId, getHistory(userId), { source: 'demo', needs_human: handoff })
-      .then((lead) => {
-        if (lead.has_lead) appendLead(lead);
-      })
-      .catch((err) => console.error('Loi trich xuat lead (demo):', err.message));
+    res.json({
+      reply: result.reply,
+      imageUrl: result.imageUrl || null,
+      clipUrl: result.clipUrl || null,
+      handoff: result.handoff || false,
+    });
+
+    handleLeadAndNotify(userId, image ? 'demo-anh' : 'demo', result.handoff);
   } catch (err) {
     console.error('Loi demo-chat:', err);
     res.status(500).json({ error: 'Bot dang gap su co, thu lai sau' });
   }
 });
 
-// Zalo se POST toi day moi khi co su kien (tin nhan, follow, ...)
+// Zalo se POST toi day moi khi co su kien (tin nhan, anh, follow, ...)
 app.post('/webhook', async (req, res) => {
   // Tra loi 200 ngay de Zalo khong bao timeout, xu ly AI chay ben duoi
   res.sendStatus(200);
@@ -72,41 +103,54 @@ app.post('/webhook', async (req, res) => {
   const event = req.body;
 
   try {
+    // Khach gui TIN NHAN VAN BAN
     if (event.event_name === 'user_send_text') {
       const userId = event.sender.id;
       const userMessage = event.message.text;
-
       console.log(`Tin nhan tu ${userId}: ${userMessage}`);
 
-      // Chan spam: neu vuot gioi han, gui cau mac dinh, khong goi Claude
       const rate = checkRate(userId);
       if (!rate.allowed) {
         await sendTextMessage(userId, RATE_LIMIT_REPLY);
         return;
       }
 
-      const { reply, imageUrl, handoff } = await getAIReply(userId, userMessage);
+      const { reply, imageUrl, clipUrl, handoff } = await getAIReply(userId, userMessage);
       await sendTextMessage(userId, reply);
 
-      // Neu bot xac dinh dung 1 mau con hang -> gui kem anh
       if (imageUrl) {
         await sendImageMessage(userId, imageUrl);
         console.log(`Da gui anh ${imageUrl} cho ${userId}`);
       }
+      if (clipUrl) {
+        await sendTextMessage(userId, `🎬 Anh/chị xem clip mẫu này nhé: ${clipUrl}`);
+      }
 
       console.log(`Da tra loi ${userId}: ${reply}${handoff ? ' [HANDOFF]' : ''}`);
-
-      // Chay ngam, khong lam cham viec tra loi khach
-      extractLead(userId, getHistory(userId), { source: 'zalo', needs_human: handoff })
-        .then((lead) => {
-          if (lead.has_lead) {
-            appendLead(lead);
-            console.log(`Da ghi lead moi tu ${userId}:`, lead);
-          }
-        })
-        .catch((err) => console.error('Loi khi trich xuat lead:', err.message));
+      handleLeadAndNotify(userId, 'zalo', handoff);
     }
-    // Co the xu ly them cac event_name khac: user_send_image, follow, unfollow...
+
+    // Khach GUI ANH -> luong dinh gia / thu mua (Claude vision)
+    if (event.event_name === 'user_send_image') {
+      const userId = event.sender.id;
+      const att = (event.message && event.message.attachments || []).find((a) => a.type === 'image');
+      const url = att && att.payload && att.payload.url;
+      if (!url) return;
+
+      console.log(`Anh dinh gia tu ${userId}: ${url}`);
+
+      const rate = checkRate(userId);
+      if (!rate.allowed) {
+        await sendTextMessage(userId, RATE_LIMIT_REPLY);
+        return;
+      }
+
+      const { reply } = await getAIReplyForImage(userId, { url });
+      await sendTextMessage(userId, reply);
+      console.log(`Da tra loi (dinh gia) ${userId}`);
+      handleLeadAndNotify(userId, 'zalo-anh', true);
+    }
+    // Co the xu ly them: follow, unfollow...
   } catch (err) {
     console.error('Loi khi xu ly webhook:', err);
   }

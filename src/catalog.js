@@ -9,7 +9,8 @@ const { getSheets } = require('./googleClient');
 const { SHOP_INFO, STATIC_CATALOG_FALLBACK } = require('./data/stwatchProfile');
 
 const SHEET_ID = process.env.CATALOG_SHEET_ID || '1RbHSYnAUKQXIY-2c1iw_NVSDclKUdCO2ss4HNr1RsgU';
-const SHEET_RANGE = process.env.CATALOG_RANGE || 'A:H';
+// Cot A..I: ID | Ten mau | Hang | Gia | Tinh trang | Con hang | Mo ta | Link anh | Link clip
+const SHEET_RANGE = process.env.CATALOG_RANGE || 'A:I';
 const CACHE_MS = (Number(process.env.CATALOG_CACHE_MINUTES) || 5) * 60 * 1000;
 
 let cache = { products: null, profileText: null, fetchedAt: 0 };
@@ -38,7 +39,7 @@ function looksLikeHeader(row) {
 }
 
 function rowToProduct(row) {
-  const [id, name, brand, price, condition, stock, description, image] = row;
+  const [id, name, brand, price, condition, stock, description, image, clip] = row;
   if (!id && !name) return null; // bo qua dong trong
   if (String(id || '').trim().toLowerCase() === 'id') return null; // bo dong header lot vao
   return {
@@ -50,6 +51,7 @@ function rowToProduct(row) {
     inStock: parseInStock(stock),
     description: String(description || '').trim(),
     image: String(image || '').trim(),
+    clip: String(clip || '').trim(),
   };
 }
 
@@ -62,6 +64,7 @@ function buildProfileText(products) {
       p.condition ? `Tinh trang: ${p.condition}` : null,
       `Kho: ${stock}`,
       p.description ? `Mo ta: ${p.description}` : null,
+      p.clip ? 'Co clip san pham' : null,
     ].filter(Boolean);
     return parts.join(' | ');
   });

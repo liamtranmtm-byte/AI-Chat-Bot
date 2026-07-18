@@ -134,6 +134,22 @@ Service account cần scope Drive (đã có sẵn trong code) — chỉ cần **
 - Nhiều shop (multi-tenant)
 - Nút bấm nhanh (quick reply) trong Zalo
 
+## Nâng cấp Giai đoạn 2 (định giá qua ảnh, clip, thông báo lead)
+
+1. **Khách gửi ảnh nhờ định giá** — khách gửi ảnh đồng hồ, bot dùng Claude vision quan sát, mô tả,
+   hỏi thêm thông tin (model, tình trạng máy, hộp/giấy tờ) rồi **chuyển nhân viên thẩm định** báo
+   giá chính xác. Bot **không** tự đưa giá thu mua (tránh sai/liability).
+   - Zalo: tự nhận sự kiện `user_send_image`.
+   - Demo: bấm nút **📷** trong khung chat để gửi ảnh (ảnh tự thu nhỏ ≤1024px trước khi gửi).
+   - *(Chưa làm: tự động ra giá — cố ý để nhân viên thẩm định quyết.)*
+2. **Clip sản phẩm** — thêm **cột thứ 9 "Link clip"** vào Sheet (sau cột "Link ảnh"). Khi bot tư vấn
+   một mẫu có clip và khách muốn xem, bot gửi kèm: demo hiện nút **▶ Xem clip**, Zalo gửi link
+   (TikTok/YouTube/Drive). Mẫu không có clip thì bỏ trống ô đó.
+3. **Thông báo lead cho nhân viên** — khi có lead mới hoặc khách cần người thật, hệ thống POST một
+   thông báo tới `LEAD_NOTIFY_WEBHOOK_URL` (Slack / Google Chat / Discord). Để trống biến này = tắt.
+   - Slack/Google Chat: dán Incoming Webhook URL. Discord: dán Webhook URL. (Gửi cả `text` lẫn
+     `content` nên dùng được cả ba.)
+
 ## Tùy chỉnh
 
 - Đổi tính cách/nhiệm vụ của bot: sửa `SYSTEM_PROMPT` trong `.env` (để trống thì dùng prompt built-in trong `src/claudeClient.js`, đã bao gồm quy tắc hết hàng / gửi ảnh / handoff)

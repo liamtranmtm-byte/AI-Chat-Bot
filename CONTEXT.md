@@ -97,15 +97,22 @@ src/leadStore.js ghi lead vào Google Sheet tab "Leads" (fallback leads.json)
 `GOOGLE_SERVICE_ACCOUNT_JSON`, `CATALOG_SHEET_ID`, `DRIVE_IMAGE_FOLDER_ID`. Chi tiết ở README
 mục "Nâng cấp Giai đoạn 1". Ảnh hiện là ảnh minh hoạ có nhãn — cần thay bằng ảnh thật của shop.
 
-## Việc cần làm tiếp theo (Giai đoạn 2 — backlog, chưa chốt ưu tiên)
+## Giai đoạn 2 — ĐÃ LÀM (chờ nghiệm thu trên demo)
 
-- Clip sản phẩm: thêm cột "Link clip" trong Sheet; bot gửi link/nhúng clip (demo nhúng,
-  Zalo gửi link TikTok/YouTube)
-- Khách gửi ảnh nhờ định giá: nhận ảnh khách gửi, dùng Claude vision ước lượng / hỏi thêm
-  thông tin rồi chuyển nhân viên thẩm định
-- Quick-reply (nút bấm nhanh) trong Zalo thay vì gõ tay
+1. ✅ Khách gửi ảnh nhờ định giá (Claude vision) — Zalo nhận `user_send_image`; demo có nút 📷.
+   Bot mô tả + hỏi thêm thông tin + chuyển nhân viên thẩm định; KHÔNG tự ra giá thu mua.
+2. ✅ Clip sản phẩm — cột thứ 9 "Link clip" trong Sheet; marker [[CLIP:ID]]; demo hiện nút "Xem
+   clip", Zalo gửi link.
+3. ✅ Thông báo lead/handoff cho nhân viên qua webhook (`LEAD_NOTIFY_WEBHOOK_URL`,
+   Slack/Google Chat/Discord). Để trống = tắt.
+
+Config GĐ2 (tuỳ chọn): thêm cột "Link clip" vào Sheet; đặt `LEAD_NOTIFY_WEBHOOK_URL` nếu muốn
+thông báo. Chi tiết ở README mục "Nâng cấp Giai đoạn 2".
+
+## Việc cần làm tiếp theo (backlog còn lại)
+
+- Quick-reply (nút bấm nhanh) trong Zalo — cần Zalo thật mới test đầy đủ
 - Multi-tenant: 1 hệ thống phục vụ nhiều shop (mỗi shop 1 Sheet/OA riêng)
-- Thông báo lead/handoff cho nhân viên theo thời gian thực (email/Zalo nội bộ)
 
 **Nguyên tắc giữ nguyên:** CHỈ khi có khách đồng ý dùng thật mới xử lý Zalo OA thật (README có
 mục "OA thử nghiệm kỹ thuật" + gói Tăng trưởng). Không tự ý mở rộng ngoài phạm vi đã chốt.

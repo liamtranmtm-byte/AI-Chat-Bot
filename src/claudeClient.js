@@ -46,6 +46,8 @@ QUY TẮC BẮT BUỘC:
    ảnh sẽ giúp khách, hãy thêm vào CUỐI câu trả lời, trên một dòng riêng, đúng marker:
    [[IMG:<ID>]]  (thay <ID> bằng đúng mã sản phẩm trong danh sách, ví dụ [[IMG:RL001]]).
    Chỉ gắn MỘT marker ảnh, và chỉ cho mẫu CÒN HÀNG. Nếu đang nói về nhiều mẫu thì không gắn.
+   Nếu mẫu đó có ghi "Co clip san pham" và khách muốn xem thêm, có thể gắn thêm marker
+   [[CLIP:<ID>]] (cùng dòng riêng ở cuối) để gửi clip. Chỉ gắn khi mẫu thật sự có clip.
 4. CHUYỂN NHÂN VIÊN THẬT: Nếu khách tỏ ra bực bội/phàn nàn, hoặc hỏi ngoài phạm vi dữ liệu
    (không trả lời được bằng thông tin đã có), hoặc khách chủ động đòi gặp người thật -> KHÔNG
    trả lời bừa. Thay vào đó nói: "Dạ, để em chuyển anh/chị cho nhân viên tư vấn trực tiếp hỗ
@@ -65,6 +67,7 @@ function getHistory(userId) {
 function parseMarkers(rawText) {
   let handoff = false;
   let productId = null;
+  let clipId = null;
 
   let text = rawText.replace(/\[\[HANDOFF\]\]/gi, () => {
     handoff = true;
@@ -76,7 +79,12 @@ function parseMarkers(rawText) {
     return '';
   });
 
-  return { text: text.trim(), handoff, productId };
+  text = text.replace(/\[\[CLIP:\s*([^\]]+?)\s*\]\]/gi, (_m, id) => {
+    clipId = id.trim();
+    return '';
+  });
+
+  return { text: text.trim(), handoff, productId, clipId };
 }
 
 // Tra ve { reply, imageUrl, productId, handoff }.
@@ -106,7 +114,7 @@ async function getAIReply(userId, userMessage) {
   const rawReply = data?.content?.find((block) => block.type === 'text')?.text
     || 'Dạ em xin lỗi, hệ thống đang gặp chút sự cố, anh/chị thử lại sau ít phút giúp em nhé ạ.';
 
-  const { text: reply, handoff, productId } = parseMarkers(rawReply);
+  const { text: reply, handoff, productId, clipId } = parseMarkers(rawReply);
 
   // Luu ban da lam sach marker vao lich su (tranh model bat chuoc marker lung tung)
   history.push({ role: 'assistant', content: reply });
@@ -118,7 +126,80 @@ async function getAIReply(userId, userMessage) {
     if (product && product.inStock) imageUrl = await resolveImageUrl(product);
   }
 
-  return { reply, imageUrl, productId, handoff };
+  // Clip san pham (neu mau co cot Link clip)
+  let clipUrl = null;
+  if (clipId) {
+    const product = await getProductById(clipId);
+    if (product && product.clip) clipUrl = product.clip;
+  }
+
+  return { reply, imageUrl, clipUrl, productId, handoff };
 }
 
-module.exports = { getAIReply, getHistory };
+// System prompt rieng cho ca khach GUI ANH nho dinh gia / thu mua.
+const APPRAISAL_SYSTEM = `Khách gửi ẢNH một chiếc đồng hồ để nhờ định giá / bán lại cho STWatch.
+Bạn là trợ lý của STWatch, trả lời tiếng Việt CÓ DẤU, xưng "em", gọi khách "anh/chị".
+
+Nhiệm vụ:
+1. Quan sát ảnh và mô tả ngắn gọn những gì thấy được: hãng/dòng nếu nhận ra, kiểu dáng, màu mặt,
+   loại dây, tình trạng bề ngoài. Nếu ảnh mờ/thiếu góc, lịch sự xin thêm ảnh rõ hơn.
+2. TUYỆT ĐỐI KHÔNG đưa ra giá thu mua cụ thể hay cam kết. Định giá chính xác phải do nhân viên
+   thẩm định trực tiếp (cần kiểm tra máy, giấy tờ, độ thật giả). Cùng lắm chỉ nói một khoảng rất
+   chung nếu chắc chắn, kèm câu "giá chính xác cần thẩm định trực tiếp ạ".
+3. Hỏi thêm thông tin quan trọng để thẩm định: model/mã tham chiếu, năm mua, tình trạng máy còn
+   chạy tốt không, có đủ hộp và giấy tờ không.
+4. Mời khách để lại số điện thoại hoặc mang máy tới showroom 285 Phan Văn Trị để nhân viên thẩm
+   định báo giá chính xác.
+Kết thúc câu trả lời bằng marker [[HANDOFF]] (đây là ca cần nhân viên thẩm định).`;
+
+// Tra loi khi khach GUI ANH (dinh gia/thu mua). image = {url} hoac {base64, mediaType}.
+async function getAIReplyForImage(userId, image, caption) {
+  const history = getHistory(userId);
+
+  const userContent = [];
+  if (image.url) {
+    userContent.push({ type: 'image', source: { type: 'url', url: image.url } });
+  } else if (image.base64) {
+    userContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: image.mediaType || 'image/jpeg', data: image.base64 },
+    });
+  }
+  userContent.push({
+    type: 'text',
+    text: (caption && caption.trim()) ? caption.trim() : 'Anh/chị nhờ shop định giá chiếc đồng hồ này ạ.',
+  });
+
+  const profile = await getProfileText();
+  const messages = [...history.slice(-MAX_TURNS), { role: 'user', content: userContent }];
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
+      max_tokens: 600,
+      system: `${APPRAISAL_SYSTEM}\n\n${profile}`,
+      messages,
+    }),
+  });
+
+  const data = await res.json();
+  const rawReply = data?.content?.find((block) => block.type === 'text')?.text
+    || 'Dạ em đã nhận ảnh của anh/chị. Để em chuyển nhân viên thẩm định hỗ trợ báo giá chính xác nhé ạ.';
+
+  const { text: reply } = parseMarkers(rawReply);
+
+  // Luu placeholder van ban vao lich su (khong luu anh de tranh gui lai moi luot)
+  history.push({ role: 'user', content: `[Khách gửi ảnh đồng hồ nhờ định giá]${caption ? ' - ' + caption : ''}` });
+  history.push({ role: 'assistant', content: reply });
+
+  // Ca dinh gia luon can nhan vien that
+  return { reply, imageUrl: null, clipUrl: null, productId: null, handoff: true };
+}
+
+module.exports = { getAIReply, getAIReplyForImage, getHistory };
