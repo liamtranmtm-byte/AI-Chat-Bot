@@ -97,17 +97,21 @@ src/leadStore.js ghi lead vào Google Sheet tab "Leads" (fallback leads.json)
 `GOOGLE_SERVICE_ACCOUNT_JSON`, `CATALOG_SHEET_ID`, `DRIVE_IMAGE_FOLDER_ID`. Chi tiết ở README
 mục "Nâng cấp Giai đoạn 1". Ảnh hiện là ảnh minh hoạ có nhãn — cần thay bằng ảnh thật của shop.
 
-## Giai đoạn 2 — ĐÃ LÀM (chờ nghiệm thu trên demo)
+## Giai đoạn 2 — ĐÃ HOÀN THÀNH (đã test thật trên bản deploy)
 
 1. ✅ Khách gửi ảnh nhờ định giá (Claude vision) — Zalo nhận `user_send_image`; demo có nút 📷.
    Bot mô tả + hỏi thêm thông tin + chuyển nhân viên thẩm định; KHÔNG tự ra giá thu mua.
-2. ✅ Clip sản phẩm — cột thứ 9 "Link clip" trong Sheet; marker [[CLIP:ID]]; demo hiện nút "Xem
-   clip", Zalo gửi link.
+2. ✅ Clip sản phẩm — cột "Link clip" trong Sheet; demo hiện nút "Xem clip", Zalo gửi link.
 3. ✅ Thông báo lead/handoff cho nhân viên qua webhook (`LEAD_NOTIFY_WEBHOOK_URL`,
-   Slack/Google Chat/Discord). Để trống = tắt.
+   Slack/Google Chat/Discord — đã test bắn thật qua webhook.site). Để trống = tắt.
 
-Config GĐ2 (tuỳ chọn): thêm cột "Link clip" vào Sheet; đặt `LEAD_NOTIFY_WEBHOOK_URL` nếu muốn
-thông báo. Chi tiết ở README mục "Nâng cấp Giai đoạn 2".
+Cải tiến kèm theo (đã test):
+- Server **đọc cột Sheet theo TÊN header** (không theo vị trí) → chủ shop thêm/xoá/đảo cột tuỳ ý.
+- Tự dò tên mẫu trong câu trả lời để đính ảnh/clip (không phụ thuộc bot gắn marker).
+- Sửa parse lead JSON bọc ```json; endpoint `/debug/catalog?key=ADMIN_KEY` để chẩn đoán.
+
+Config GĐ2 (tuỳ chọn): cột "Link clip" trong Sheet; đặt `LEAD_NOTIFY_WEBHOOK_URL` nếu muốn thông
+báo. Chi tiết ở README mục "Nâng cấp Giai đoạn 2".
 
 ## Việc cần làm tiếp theo (backlog còn lại)
 
