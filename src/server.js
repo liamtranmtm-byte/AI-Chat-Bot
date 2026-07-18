@@ -11,8 +11,8 @@ const app = express();
 app.use(express.json());
 
 // Cau tra loi mac dinh khi user bi chan spam (khong goi Claude)
-const RATE_LIMIT_REPLY = 'Da anh/chi oi, anh/chi nhan hoi nhanh nen em xu ly chua kip a. '
-  + 'Anh/chi cho em vai giay roi nhan lai giup em nhe ah.';
+const RATE_LIMIT_REPLY = 'Dạ anh/chị ơi, anh/chị nhắn hơi nhanh nên em xử lý chưa kịp ạ. '
+  + 'Anh/chị chờ em vài giây rồi nhắn lại giúp em nhé ạ.';
 
 // Kiem tra server song, dung de test nhanh sau khi deploy
 app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));

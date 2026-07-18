@@ -5,20 +5,20 @@
 // tin chung + mot ban fallback tinh de trang /demo van chay khi chua cau hinh
 // Google Service Account.
 
-const SHOP_INFO = `THONG TIN CUA HANG (dung de tra loi khach, khong duoc bia them):
+const SHOP_INFO = `THÔNG TIN CỬA HÀNG (dùng để trả lời khách, không được bịa thêm):
 
-- Ten: STWatch - Trung tam Thu mua, Tham dinh, Bao duong Dong ho chinh hang
-- Dia chi showroom: 285 Phan Van Tri, Phuong Binh Loi Trung, TP.HCM
+- Tên: STWatch - Trung tâm Thu mua, Thẩm định, Bảo dưỡng Đồng hồ chính hãng
+- Địa chỉ showroom: 285 Phan Văn Trị, Phường Bình Lợi Trung, TP.HCM
 - Hotline: 0906.632.888
-- Zalo tu van: zalo.me/0906632888
+- Zalo tư vấn: zalo.me/0906632888
 
-DICH VU:
-1. Ban dong ho chinh hang (Rolex, Omega, Seiko, Tissot, Casio G-Shock, Orient, Citizen...)
-2. Thu mua dong ho cu - gia cao, thanh toan nhanh
-3. Tham dinh chinh hang - kiem tra xac thuc nguon goc
-4. Bao duong & sua chua - lau dau, thay pin, thay kinh, danh bong
-5. Phu kien: day deo, khoa, mat kinh
-6. Dao tao hoc vien sua dong ho chuyen nghiep`;
+DỊCH VỤ:
+1. Bán đồng hồ chính hãng (Rolex, Omega, Seiko, Tissot, Casio G-Shock, Orient, Citizen...)
+2. Thu mua đồng hồ cũ - giá cao, thanh toán nhanh
+3. Thẩm định chính hãng - kiểm tra xác thực nguồn gốc
+4. Bảo dưỡng & sửa chữa - lau dầu, thay pin, thay kính, đánh bóng
+5. Phụ kiện: dây đeo, khóa, mặt kính
+6. Đào tạo học viên sửa đồng hồ chuyên nghiệp`;
 
 // Ban fallback tinh (khop cau truc voi du lieu keo tu Sheet) - chi dung khi
 // Google Sheet chua cau hinh / loi ket noi.
