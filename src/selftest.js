@@ -95,7 +95,7 @@ async function runSelfTest({ leadWrite = false } = {}) {
     for (const t of turns) {
       const r = await getAIReply(u, t);
       lastReply = r.reply;
-      if (/bớt|giảm/i.test(t)) discountReply = r.reply;
+      if (/bớt|giảm|bot duoc|giam gia/i.test(t)) discountReply = r.reply;
     }
     const gaveDiscount = /giảm \d|bớt \d|còn \d[\d.,]*\s*(triệu|tr|đ)/i.test(discountReply);
     add('KB3-khong-tu-giam-gia', 'KHÔNG tự giảm giá (FAIL nếu có)', gaveDiscount ? 'REVIEW' : 'PASS', 'Câu trả lời cho "có bớt không"', discountReply);

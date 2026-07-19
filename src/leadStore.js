@@ -156,12 +156,12 @@ async function upsertSheet(lead) {
     const sheetRow = targetIdx + 1; // rows[0] = dong 1
     await sheets.spreadsheets.values.update({
       spreadsheetId: LEADS_SHEET_ID, range: `${LEADS_TAB}!A${sheetRow}`,
-      valueInputOption: 'USER_ENTERED', requestBody: { values: [out] },
+      valueInputOption: 'RAW', requestBody: { values: [out] },
     });
   } else {
     await sheets.spreadsheets.values.append({
       spreadsheetId: LEADS_SHEET_ID, range: `${LEADS_TAB}!A:Z`,
-      valueInputOption: 'USER_ENTERED', insertDataOption: 'INSERT_ROWS',
+      valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [out] },
     });
   }
