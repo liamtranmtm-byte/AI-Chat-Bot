@@ -44,4 +44,19 @@ async function notifyLead(lead) {
   }
 }
 
-module.exports = { notifyLead, isEnabled };
+// Gui 1 doan text bat ky toi webhook (dung cho thong bao selftest...).
+async function notifyText(text) {
+  if (!WEBHOOK || !text) return;
+  try {
+    const res = await fetch(WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, content: text }),
+    });
+    if (!res.ok) console.error('Webhook notifyText tra ve loi:', res.status);
+  } catch (err) {
+    console.error('Loi gui notifyText:', err.message);
+  }
+}
+
+module.exports = { notifyLead, notifyText, isEnabled };

@@ -230,6 +230,29 @@ app.listen(PORT, () => {
   console.log(`Server dang chay o port ${PORT}`);
 });
 
+// Tu chay selftest luc khoi dong (dat SELFTEST_ON_START=1). Ket qua ghi ra log Render
+// + day ve LEAD_NOTIFY_WEBHOOK_URL neu co. LUU Y: Render free "ngu" roi khoi dong lai ->
+// se chay lai moi lan cold start (ton token). Chay xong nen BO bien nay di.
+if (process.env.SELFTEST_ON_START === '1') {
+  setTimeout(async () => {
+    try {
+      const { runSelfTest } = require('./selftest');
+      const { notifyText } = require('./notifier');
+      const r = await runSelfTest({ leadWrite: process.env.SELFTEST_LEADWRITE === '1' });
+      const fails = r.results.filter((x) => x.status === 'FAIL' || x.status === 'ERROR');
+      const head = `🧪 Selftest STWatch: PASS ${r.summary.PASS || 0} · FAIL ${r.summary.FAIL || 0} · REVIEW ${r.summary.REVIEW || 0} · ERROR ${r.summary.ERROR || 0}`;
+      const body = fails.length
+        ? '\n' + fails.map((x) => `❌ ${x.scenario}: ${x.check}\n   ${String(x.detail || '').slice(0, 160)}`).join('\n')
+        : '\n✅ Tất cả kịch bản đạt.';
+      console.log(head + body);
+      console.log('Selftest chi tiet:', JSON.stringify(r.results));
+      await notifyText(head + body);
+    } catch (err) {
+      console.error('Loi selftest khi khoi dong:', err.message);
+    }
+  }, 4000);
+}
+
 // Tu dong lam moi Zalo access_token moi 20 tieng (truoc khi het han ~25h).
 // Chi chay khi da cau hinh Zalo (co ZALO_APP_ID) de tranh loi vo nghia khi chi chay demo.
 if (process.env.ZALO_APP_ID) {
