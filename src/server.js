@@ -193,21 +193,43 @@ app.get('/leads', async (req, res) => {
   }
 });
 
-// Tu chay kich ban nghiem thu (goi Claude noi bo), tra ve JSON ket qua. Vd:
-// /admin/selftest?key=ADMIN_KEY          (khong dong vao Sheet)
-// /admin/selftest?key=ADMIN_KEY&leadwrite=1   (test luon ghi lead vao Sheet)
-app.get('/admin/selftest', async (req, res) => {
-  if (req.query.key !== process.env.ADMIN_KEY) {
-    return res.status(401).json({ error: 'Sai key' });
-  }
+// Selftest chay NEN (nhieu lan goi Claude ~30-60s) -> khong giu ket noi cho lau
+// (tranh ERR_CONNECTION_ABORTED tren Render free). Bam /admin/selftest de khoi chay,
+// roi mo /admin/selftest-result de xem ket qua (hoac cho webhook).
+let lastSelfTest = { status: 'none' };
+
+async function runAndStoreSelfTest(leadWrite) {
+  lastSelfTest = { status: 'running', startedAt: new Date().toISOString(), leadWrite };
   try {
     const { runSelfTest } = require('./selftest');
-    const result = await runSelfTest({ leadWrite: req.query.leadwrite === '1' });
-    res.json(result);
+    const { notifyText } = require('./notifier');
+    const r = await runSelfTest({ leadWrite });
+    lastSelfTest = { status: 'done', ...r };
+    const fails = r.results.filter((x) => x.status === 'FAIL' || x.status === 'ERROR');
+    const head = `🧪 Selftest STWatch: PASS ${r.summary.PASS || 0} · FAIL ${r.summary.FAIL || 0} · REVIEW ${r.summary.REVIEW || 0} · ERROR ${r.summary.ERROR || 0}`;
+    const body = fails.length ? '\n' + fails.map((x) => `❌ ${x.scenario}: ${x.check}`).join('\n') : '\n✅ Tất cả kịch bản đạt.';
+    console.log(head + body);
+    await notifyText(head + body);
   } catch (err) {
+    lastSelfTest = { status: 'error', error: err.message, at: new Date().toISOString() };
     console.error('Loi selftest:', err.message);
-    res.status(500).json({ error: err.message });
   }
+}
+
+// Khoi chay selftest (tra ve ngay). Them &leadwrite=1 de test ghi Sheet.
+app.get('/admin/selftest', (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(401).json({ error: 'Sai key' });
+  if (lastSelfTest.status === 'running') {
+    return res.json({ status: 'running', startedAt: lastSelfTest.startedAt, note: 'Dang chay, mo /admin/selftest-result de xem ket qua.' });
+  }
+  runAndStoreSelfTest(req.query.leadwrite === '1'); // chay nen, khong await
+  res.json({ started: true, note: 'Selftest dang chay (~30-60s). Mo /admin/selftest-result?key=... de xem ket qua, hoac cho webhook.' });
+});
+
+// Xem ket qua selftest gan nhat.
+app.get('/admin/selftest-result', (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(401).json({ error: 'Sai key' });
+  res.json(lastSelfTest);
 });
 
 // Don sach tab Leads (giu tieu de) - dung de xoa dong rac cu. Vd:
@@ -234,23 +256,7 @@ app.listen(PORT, () => {
 // + day ve LEAD_NOTIFY_WEBHOOK_URL neu co. LUU Y: Render free "ngu" roi khoi dong lai ->
 // se chay lai moi lan cold start (ton token). Chay xong nen BO bien nay di.
 if (process.env.SELFTEST_ON_START === '1') {
-  setTimeout(async () => {
-    try {
-      const { runSelfTest } = require('./selftest');
-      const { notifyText } = require('./notifier');
-      const r = await runSelfTest({ leadWrite: process.env.SELFTEST_LEADWRITE === '1' });
-      const fails = r.results.filter((x) => x.status === 'FAIL' || x.status === 'ERROR');
-      const head = `🧪 Selftest STWatch: PASS ${r.summary.PASS || 0} · FAIL ${r.summary.FAIL || 0} · REVIEW ${r.summary.REVIEW || 0} · ERROR ${r.summary.ERROR || 0}`;
-      const body = fails.length
-        ? '\n' + fails.map((x) => `❌ ${x.scenario}: ${x.check}\n   ${String(x.detail || '').slice(0, 160)}`).join('\n')
-        : '\n✅ Tất cả kịch bản đạt.';
-      console.log(head + body);
-      console.log('Selftest chi tiet:', JSON.stringify(r.results));
-      await notifyText(head + body);
-    } catch (err) {
-      console.error('Loi selftest khi khoi dong:', err.message);
-    }
-  }, 4000);
+  setTimeout(() => runAndStoreSelfTest(process.env.SELFTEST_LEADWRITE === '1'), 4000);
 }
 
 // Tu dong lam moi Zalo access_token moi 20 tieng (truoc khi het han ~25h).
