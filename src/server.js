@@ -193,6 +193,23 @@ app.get('/leads', async (req, res) => {
   }
 });
 
+// Tu chay kich ban nghiem thu (goi Claude noi bo), tra ve JSON ket qua. Vd:
+// /admin/selftest?key=ADMIN_KEY          (khong dong vao Sheet)
+// /admin/selftest?key=ADMIN_KEY&leadwrite=1   (test luon ghi lead vao Sheet)
+app.get('/admin/selftest', async (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Sai key' });
+  }
+  try {
+    const { runSelfTest } = require('./selftest');
+    const result = await runSelfTest({ leadWrite: req.query.leadwrite === '1' });
+    res.json(result);
+  } catch (err) {
+    console.error('Loi selftest:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Don sach tab Leads (giu tieu de) - dung de xoa dong rac cu. Vd:
 // /admin/leads-reset?key=ADMIN_KEY  (GET cho tien mo tren trinh duyet)
 app.get('/admin/leads-reset', async (req, res) => {
