@@ -4,7 +4,7 @@ const express = require('express');
 const { getAIReply, getAIReplyForImage, getHistory } = require('./claudeClient');
 const { sendTextMessage, sendImageMessage, refreshAccessToken } = require('./zaloClient');
 const { extractLead } = require('./leadExtractor');
-const { appendLead, loadLeads } = require('./leadStore');
+const { appendLead, loadLeads, resetLeads } = require('./leadStore');
 const { checkRate } = require('./rateLimiter');
 const { streamImage } = require('./driveImages');
 const { notifyLead } = require('./notifier');
@@ -190,6 +190,21 @@ app.get('/leads', async (req, res) => {
   } catch (err) {
     console.error('Loi doc lead:', err.message);
     res.status(500).json({ error: 'Khong doc duoc danh sach lead' });
+  }
+});
+
+// Don sach tab Leads (giu tieu de) - dung de xoa dong rac cu. Vd:
+// /admin/leads-reset?key=ADMIN_KEY  (GET cho tien mo tren trinh duyet)
+app.get('/admin/leads-reset', async (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Sai key' });
+  }
+  try {
+    const result = await resetLeads();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Loi reset leads:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
