@@ -131,7 +131,7 @@ async function runSelfTest({ leadWrite = false } = {}) {
 
   const summary = { PASS: 0, FAIL: 0, REVIEW: 0, ERROR: 0 };
   for (const x of R) summary[x.status] = (summary[x.status] || 0) + 1;
-  return { ranAt: new Date().toISOString(), leadWrite, summary, results: R };
+  return { build: require('./version'), ranAt: new Date().toISOString(), leadWrite, summary, results: R };
 }
 
 module.exports = { runSelfTest };

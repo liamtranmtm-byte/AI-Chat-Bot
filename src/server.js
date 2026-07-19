@@ -41,6 +41,9 @@ function handleLeadAndNotify(userId, source, handoff) {
 // Kiem tra server song, dung de test nhanh sau khi deploy
 app.get('/', (req, res) => res.send('Zalo AI chatbot dang chay OK'));
 
+// Xem phien ban code dang chay (de xac nhan Render da deploy dung commit).
+app.get('/version', (req, res) => res.json({ build: require('./version') }));
+
 // Trang demo chat doc lap, khong dung Zalo - dung de pitch khach truoc khi
 // ho can tra tien goi Zalo OA. Sau khi deploy, mo: https://ten-app.onrender.com/demo
 app.use('/demo', express.static(path.join(__dirname, '..', 'public')));
